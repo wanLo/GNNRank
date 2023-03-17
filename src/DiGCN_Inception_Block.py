@@ -3,7 +3,7 @@ from typing import Tuple
 import torch
 from torch.nn import Linear
 
-from DiGCNConv import DiGCNConv
+from .DiGCNConv import DiGCNConv
 
 
 class DiGCN_InceptionBlock(torch.nn.Module):

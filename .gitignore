@@ -137,3 +137,9 @@ debug_logs/
 
 # debug files
 result_arrays/debug/
+
+# macos
+.DS_Store
+
+# train-test splits
+*train_r100test_r100.pk

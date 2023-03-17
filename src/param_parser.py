@@ -96,7 +96,8 @@ def parameter_parser():
                         help='Data set folder.')
     parser.add_argument('--dataset', type=str, default='ERO/', help='Data set selection.')
     
-    args = parser.parse_args()
+    args, unknown = parser.parse_known_args()
+    
     if args.dataset[-1]!='/':
         args.dataset += '/'
 

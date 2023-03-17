@@ -8,10 +8,10 @@ import torch
 import scipy.sparse as sp
 import numpy.random as rnd
 
-# internel
-from utils import  ERO
-from extract_network import extract_network
-from generate_data import to_dataset_no_label, to_dataset_no_split
+# internal
+from .utils import  ERO
+from .extract_network import extract_network
+from .generate_data import to_dataset_no_label, to_dataset_no_split
 
 
 

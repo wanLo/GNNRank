@@ -4,8 +4,8 @@ import torch
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 
-from RankingGNNBase import RankingGNNBase
-from DiGCN_Inception_Block import DiGCN_InceptionBlock as InceptionBlock
+from .RankingGNNBase import RankingGNNBase
+from .DiGCN_Inception_Block import DiGCN_InceptionBlock as InceptionBlock
 
 import torch
 from torch.nn.parameter import Parameter

@@ -4,7 +4,7 @@ import pickle as pk
 import scipy.sparse as sp
 from torch_geometric.data import Data
 
-from utils import hermitian_feature
+from .utils import hermitian_feature
 
 
 def to_dataset_no_label(A, num_clusters, save_path, load_only=False, features=None):
