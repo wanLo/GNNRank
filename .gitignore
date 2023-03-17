@@ -142,4 +142,4 @@ result_arrays/debug/
 .DS_Store
 
 # train-test splits
-*train_r100test_r100.pk
+*train_*test_*.pk

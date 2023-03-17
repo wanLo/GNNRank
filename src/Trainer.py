@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.optim as optim
 from scipy.stats import kendalltau, rankdata
+from tqdm.auto import tqdm # automatically use command-line or notebook version
 
 # internal files
 from .utils import write_log, scipy_sparse_to_torch_sparse, get_powers_sparse
@@ -252,114 +253,122 @@ class Trainer(object):
                     serialRank_mat = serialRank_matrix(self.A[train_index][:, train_index])
                     serialRank_mat = serialRank_mat/max(0.1, serialRank_mat.max())
                     serial_matrix_train = torch.FloatTensor(serialRank_mat.toarray()).to(self.device)
+                
+                last_time = time.time() # slow down updating the postfix of tqdm
+                
+                with tqdm(range(args.epochs), unit='epochs') as tqdm_bar:
+                    for epoch in tqdm_bar:
 
-                for epoch in range(args.epochs):
-                    if self.args.optimizer == 'Adam' and epoch == self.args.pretrain_epochs and self.args.train_with[:8] == 'proximal':
-                        opt = optim.SGD(model.parameters(), lr=10*self.args.lr,
-                                        weight_decay=self.args.weight_decay)
-                    start_time = time.time()
-                    ####################
-                    # Train
-                    ####################
+                        if self.args.optimizer == 'Adam' and epoch == self.args.pretrain_epochs and self.args.train_with[:8] == 'proximal':
+                            opt = optim.SGD(model.parameters(), lr=10*self.args.lr,
+                                            weight_decay=self.args.weight_decay)
+                        start_time = time.time()
+                        ####################
+                        # Train
+                        ####################
 
-                    model.train()
-                    if model_name == 'DIGRAC':
-                        _ = model(norm_A, norm_At, self.features)
-                    elif model_name == 'ib':
-                        _ = model(edge_index, edge_weights, self.features)
-                    if train_with == 'dist' or (epoch < self.args.pretrain_epochs and self.args.pretrain_with == 'dist'):
-                        score = model.obtain_score_from_dist()
-                    elif train_with == 'innerproduct' or (epoch < self.args.pretrain_epochs and self.args.pretrain_with == 'innerproduct'):
-                        score = model.obtain_score_from_innerproduct()
-                    else:
-                        score = model.obtain_score_from_proximal(train_with[9:])
-                       
-                    if self.args.upset_ratio_coeff > 0:
-                        train_loss_upset_ratio = calculate_upsets(M[train_index][:,train_index], score[train_index])               
-                    else:
-                        train_loss_upset_ratio = torch.ones(1, requires_grad=True).to(self.device)
-                    if self.args.upset_margin_coeff > 0:
-                        train_loss_upset_margin = calculate_upsets(M[train_index][:,train_index], score[train_index], style='margin', margin=self.args.upset_margin)               
-                    else:
-                        train_loss_upset_margin = torch.ones(1, requires_grad=True).to(self.device)
+                        model.train()
+                        if model_name == 'DIGRAC':
+                            _ = model(norm_A, norm_At, self.features)
+                        elif model_name == 'ib':
+                            _ = model(edge_index, edge_weights, self.features)
+                        if train_with == 'dist' or (epoch < self.args.pretrain_epochs and self.args.pretrain_with == 'dist'):
+                            score = model.obtain_score_from_dist()
+                        elif train_with == 'innerproduct' or (epoch < self.args.pretrain_epochs and self.args.pretrain_with == 'innerproduct'):
+                            score = model.obtain_score_from_innerproduct()
+                        else:
+                            score = model.obtain_score_from_proximal(train_with[9:])
 
-                    train_loss = self.args.upset_ratio_coeff * train_loss_upset_ratio + self.args.upset_margin_coeff * train_loss_upset_margin
-                    if self.args.pretrain_with == 'serial_similarity' and epoch < self.args.pretrain_epochs and args.train_with[:8] == 'proximal':
-                        pretrain_outside_loss = torch.mean((model.obtain_similarity_matrix()[train_index][:, train_index] - serial_matrix_train) ** 2)
-                        train_loss += pretrain_outside_loss
-                        outstrtrain = 'Train loss:, {:.6f}, upset ratio loss: {:6f}, upset margin loss: {:6f}, pretrian outside loss: {:6f},'.format(train_loss.detach().item(),
-                        train_loss_upset_ratio.detach().item(), train_loss_upset_margin.detach().item(), 
-                        pretrain_outside_loss.detach().item())
-                    else:
-                        outstrtrain = 'Train loss:, {:.6f}, upset ratio loss: {:6f}, upset margin loss: {:6f},'.format(train_loss.detach().item(),
-                        train_loss_upset_ratio.detach().item(), train_loss_upset_margin.detach().item())
-                    opt.zero_grad()
-                    try:
-                        train_loss.backward()
-                    except RuntimeError:
-                        log_str = '{} trial {} RuntimeError!'.format(model_name, split)
+                        if self.args.upset_ratio_coeff > 0:
+                            train_loss_upset_ratio = calculate_upsets(M[train_index][:,train_index], score[train_index])               
+                        else:
+                            train_loss_upset_ratio = torch.ones(1, requires_grad=True).to(self.device)
+                        if self.args.upset_margin_coeff > 0:
+                            train_loss_upset_margin = calculate_upsets(M[train_index][:,train_index], score[train_index], style='margin', margin=self.args.upset_margin)               
+                        else:
+                            train_loss_upset_margin = torch.ones(1, requires_grad=True).to(self.device)
+
+                        train_loss = self.args.upset_ratio_coeff * train_loss_upset_ratio + self.args.upset_margin_coeff * train_loss_upset_margin
+                        if self.args.pretrain_with == 'serial_similarity' and epoch < self.args.pretrain_epochs and args.train_with[:8] == 'proximal':
+                            pretrain_outside_loss = torch.mean((model.obtain_similarity_matrix()[train_index][:, train_index] - serial_matrix_train) ** 2)
+                            train_loss += pretrain_outside_loss
+                            outstrtrain = 'Train loss:, {:.6f}, upset ratio loss: {:6f}, upset margin loss: {:6f}, pretrian outside loss: {:6f},'.format(train_loss.detach().item(),
+                            train_loss_upset_ratio.detach().item(), train_loss_upset_margin.detach().item(), 
+                            pretrain_outside_loss.detach().item())
+                        else:
+                            outstrtrain = 'Train loss:, {:.6f}, upset ratio loss: {:6f}, upset margin loss: {:6f},'.format(train_loss.detach().item(),
+                            train_loss_upset_ratio.detach().item(), train_loss_upset_margin.detach().item())
+                        opt.zero_grad()
+                        try:
+                            train_loss.backward()
+                        except RuntimeError:
+                            log_str = '{} trial {} RuntimeError!'.format(model_name, split)
+                            log_str_full += log_str + '\n'
+                            print(log_str)
+                            if not os.path.isfile(self.log_path + '/'+model_name+'_model'+str(split)+'.t7'):
+                                    torch.save(model.state_dict(), self.log_path +
+                                    '/'+model_name+'_model'+str(split)+'.t7')
+                            torch.save(model.state_dict(), self.log_path +
+                                    '/'+model_name+'_model_latest'+str(split)+'.t7')
+                            break
+                        opt.step()
+                        ####################
+                        # Validation
+                        ####################
+                        model.eval()
+
+                        if model_name == 'DIGRAC':
+                            _ = model(norm_A, norm_At, self.features)
+                        elif model_name == 'ib':
+                            _ = model(edge_index, edge_weights, self.features)
+                        if train_with == 'dist' or (epoch < self.args.pretrain_epochs and self.args.pretrain_with == 'dist'):
+                            score = model.obtain_score_from_dist()
+                        elif train_with == 'innerproduct' or (epoch < self.args.pretrain_epochs and self.args.pretrain_with == 'innerproduct'):
+                            score = model.obtain_score_from_innerproduct()
+                        else:
+                            score = model.obtain_score_from_proximal(train_with[9:])
+
+                        if self.args.upset_ratio_coeff > 0:
+                            val_loss_upset_ratio = calculate_upsets(M[val_index][:,val_index], score[val_index])               
+                        else:
+                            val_loss_upset_ratio = torch.ones(1, requires_grad=True).to(self.device)
+                        if self.args.upset_margin_coeff > 0:
+                            val_loss_upset_margin = calculate_upsets(M[val_index][:,val_index], score[val_index], style='margin', margin=self.args.upset_margin)               
+                        else:
+                            val_loss_upset_margin = torch.ones(1, requires_grad=True).to(self.device)
+
+                        val_loss = self.args.upset_ratio_coeff * val_loss_upset_ratio + self.args.upset_margin_coeff * val_loss_upset_margin
+
+
+                        outstrval = 'val loss:, {:.6f}, upset ratio loss: {:6f}, upset margin loss: {:6f},'.format(val_loss.detach().item(),
+                        val_loss_upset_ratio.detach().item(), val_loss_upset_margin.detach().item())
+
+                        duration = "---, {:.4f}, seconds ---".format(time.time() - start_time)
+                        log_str = ("{}, / {} epoch,".format(epoch, args.epochs)) + outstrtrain + outstrval + duration
                         log_str_full += log_str + '\n'
-                        print(log_str)
-                        if not os.path.isfile(self.log_path + '/'+model_name+'_model'+str(split)+'.t7'):
-                                torch.save(model.state_dict(), self.log_path +
-                                '/'+model_name+'_model'+str(split)+'.t7')
-                        torch.save(model.state_dict(), self.log_path +
-                                '/'+model_name+'_model_latest'+str(split)+'.t7')
-                        break
-                    opt.step()
-                    ####################
-                    # Validation
-                    ####################
-                    model.eval()
 
-                    if model_name == 'DIGRAC':
-                        _ = model(norm_A, norm_At, self.features)
-                    elif model_name == 'ib':
-                        _ = model(edge_index, edge_weights, self.features)
-                    if train_with == 'dist' or (epoch < self.args.pretrain_epochs and self.args.pretrain_with == 'dist'):
-                        score = model.obtain_score_from_dist()
-                    elif train_with == 'innerproduct' or (epoch < self.args.pretrain_epochs and self.args.pretrain_with == 'innerproduct'):
-                        score = model.obtain_score_from_innerproduct()
-                    else:
-                        score = model.obtain_score_from_proximal(train_with[9:])
+                        if (time.time() - last_time > 0.5): # slow down updating the postfix of tqdm
+                            tqdm_bar.set_postfix_str(f"train loss: {train_loss.detach().item():.3f}, val loss: {val_loss.detach().item():.3f}")
+                            last_time = time.time()
 
-                    if self.args.upset_ratio_coeff > 0:
-                        val_loss_upset_ratio = calculate_upsets(M[val_index][:,val_index], score[val_index])               
-                    else:
-                        val_loss_upset_ratio = torch.ones(1, requires_grad=True).to(self.device)
-                    if self.args.upset_margin_coeff > 0:
-                        val_loss_upset_margin = calculate_upsets(M[val_index][:,val_index], score[val_index], style='margin', margin=self.args.upset_margin)               
-                    else:
-                        val_loss_upset_margin = torch.ones(1, requires_grad=True).to(self.device)
-                    
-                    val_loss = self.args.upset_ratio_coeff * val_loss_upset_ratio + self.args.upset_margin_coeff * val_loss_upset_margin
-
-
-                    outstrval = 'val loss:, {:.6f}, upset ratio loss: {:6f}, upset margin loss: {:6f},'.format(val_loss.detach().item(),
-                    val_loss_upset_ratio.detach().item(), val_loss_upset_margin.detach().item())
-
-                    duration = "---, {:.4f}, seconds ---".format(
-                        time.time() - start_time)
-                    log_str = ("{}, / {} epoch,".format(epoch, args.epochs)) + \
-                        outstrtrain+outstrval+duration
-                    log_str_full += log_str + '\n'
-                    print(log_str)
-                    
-                    ####################
-                    # Save weights
-                    ####################
-                    save_perform = val_loss.detach().item()
-                    if save_perform <= best_val_loss:
-                        early_stopping = 0
-                        best_val_loss = save_perform
-                        torch.save(model.state_dict(), self.log_path +
-                                '/'+model_name+'_model'+str(split)+'.t7')
-                    else:
-                        early_stopping += 1
-                    if early_stopping > args.early_stopping or epoch == (args.epochs-1):
-                        torch.save(model.state_dict(), self.log_path +
-                                '/'+model_name+'_model_latest'+str(split)+'.t7')
-                        break
+                        ####################
+                        # Save weights
+                        ####################
+                        save_perform = val_loss.detach().item()
+                        if save_perform <= best_val_loss:
+                            early_stopping = 0
+                            best_val_loss = save_perform
+                            torch.save(model.state_dict(), self.log_path +'/'+model_name+'_model'+str(split)+'.t7') # save the best model
+                        else:
+                            early_stopping += 1
+                        if early_stopping > args.early_stopping:
+                            tqdm_bar.close()
+                            print(f'Early stopped after {args.early_stopping} epochs without improvement.')
+                            break
+                
+                save_path = self.log_path + '/' + model_name + '_model_latest' + str(split) + '.t7'
+                torch.save(model.state_dict(), save_path) # save the latest model
+                #print('Saved model into: ' + save_path)
 
                 status = 'w'
                 if os.path.isfile(self.log_path + '/'+model_name+'_log'+str(split)+'.csv'):
@@ -374,8 +383,9 @@ class Trainer(object):
                 ####################
                 base_save_path = self.log_path + '/'+model_name
                 logstr = ''
-                model.load_state_dict(torch.load(
-                    self.log_path + '/'+model_name+'_model'+str(split)+'.t7'))
+                load_path = self.log_path + '/'+model_name+'_model'+str(split)+'.t7'
+                model.load_state_dict(torch.load(load_path))
+                #print('Loaded model from: ' + load_path)
                 model.eval()
 
                 if model_name == 'DIGRAC':
