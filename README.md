@@ -1,26 +1,8 @@
 # GNNRank
 
-This is the official code repo for the ICML 2022 paper -- [GNNRank: Learning Global Rankings from Pairwise Comparisons via Directed Graph Neural Networks](https://arxiv.org/pdf/2202.00211.pdf). A recorded video for the live talk at ICML 2022 is provided [via this link](https://slideslive.com/38984112/gnnrank-learning-global-rankings-from-pairwise-comparisons-via-directed-graph-neural-networks). You are also welcome to read our [poster](https://github.com/SherylHYX/GNNRank/blob/main/ICML2022_GNNRank_poster.pdf).
+This is a fork of the the [official code repo](https://github.com/SherylHYX/GNNRank) for the ICML 2022 paper -- [GNNRank: Learning Global Rankings from Pairwise Comparisons via Directed Graph Neural Networks](https://arxiv.org/pdf/2202.00211.pdf).
 
---------------------------------------------------------------------------------
-
-**Citing**
-
-
-If you find our repo or paper useful in your research, please consider adding the following citation:
-
-```bibtex
-@inproceedings{he2022gnnrank,
-  title={GNNRank: Learning Global Rankings from Pairwise Comparisons via Directed Graph Neural Networks},
-  author={He, Yixuan and Gan, Quan and Wipf, David and Reinert, Gesine D and Yan, Junchi and Cucuringu, Mihai},
-  booktitle={International Conference on Machine Learning},
-  pages={8581--8612},
-  year={2022},
-  organization={PMLR}
-}
-```
-
---------------------------------------------------------------------------------
+The objective of this fork is to make the code more accessible for integration in other projects. We refactored the `Trainer` class in `/src/Trainer.py` to supply individual methods for init, training, prediction, and evaluation. `/src/run.py` is a drop-in replacement for `/src/train.py` to run a full lifecycle of training and evaluation (see examples below).
 
 ## Environment Setup
 ### Overview
@@ -29,7 +11,7 @@ The project has been tested on the following environment specification:
 1. Ubuntu 18.04.6 LTS (Other x86_64 based Linux distributions should also be fine, such as Fedora 32)
 2. Nvidia Graphic Card (NVIDIA Tesla T4 with driver version 450.142.00) and CPU (Intel Core i7-10700 CPU @ 2.90GHz)
 3. Python 3.7 (and Python 3.6.12)
-4. CUDA 11.0 (and CUDA 9.2)
+4. CUDA 11.3 (and CUDA 9.2)
 5. Pytorch 1.10.1 (built against CUDA 11.0) and Pytorch 1.8.0 (build against CUDA 10.2)
 6. Other libraries and python packages (See below)
 
@@ -38,17 +20,22 @@ You should handle (1),(2) yourself. For (3), (4), (5) and (6), we provide a list
 
 <!-- We place those python packages that can be easily installed with one-line command in the requirement file for `pip` (`requirements_pip.txt`). For all other python packages, which are not so well maintained by [PyPI](https://pypi.org/), and all C/C++ libraries, we place in the conda requirement file (`requirements_conda.txt`). Therefore, you need to run both conda and pip to get necessary dependencies. -->
 
-We provide two examples of envionmental setup, one with CUDA 11.0 and GPU, the other with CPU.
+We provide three examples of envionmental setup, one with CUDA 10.2 and GPU, one with CUDA 11.3 and GPU, and one with CPU.
 
 Following steps assume you've done with (1) and (2).
 1. Install [conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html). Both Miniconda and Anaconda are OK.
 
-2. Create an environment and install python packages (GPU):
+2. Create an environment and install python packages (GPU, CUDA 10.2):
 ```
 conda env create -f environment_GPU.yml
 ```
 
-3. Create an environment and install python packages (CPU):
+ OR: Create an environment and install python packages (GPU, CUDA 11.3):
+```
+conda env create -f environment_cuda11.yml
+```
+
+ OR: Create an environment and install python packages (CPU):
 ```
 conda env create -f environment_CPU.yml
 ```
@@ -153,28 +140,23 @@ You can also use CPU for training if you add ``--no-duca", or GPU if you delete 
 
 ## Direct execution with training files
 
-First, get into the ./src/ folder:
-```
-cd src
-```
-
 Then, below are various options to try:
 
 Creating a GNNRank model for animal data using DIGRAC as GNN, also produce results on syncRank.
 ```
-python ./train.py --all_methods DIGRAC syncRank --dataset animal
+python ./run.py --all_methods DIGRAC syncRank --dataset animal
 ```
 Creating a GNNRank model for ERO data using both DIGRAC and ib as GNN with 350 nodes, using 0.05 as learning rate.
 ```
-python ./train.py --N 350 --all_methods DIGRAC ib --lr 0.05
+python ./run.py --N 350 --all_methods DIGRAC ib --lr 0.05
 ```
 Creating a GNNRank model for basketball data in season 2010 using all baselines excluding mvr, also save predicted results.
 ```
-python ./train.py --dataset basketball --season 2010 -SP --all_methods baselines_shorter
+python ./run.py --dataset basketball --season 2010 -SP --all_methods baselines_shorter
 ```
 Creating a model for HeadToHead data set with specific number of trials, hidden units and use CPU.
 ```
-python ./train.py --dataset HeadToHead --no-cuda --num_trials 5 --hidden 8
+python ./run.py --dataset HeadToHead --no-cuda --num_trials 5 --hidden 8
 ```
 --------------------------------------------------------------------------------
 
