@@ -84,35 +84,54 @@ for random_seed in args.seeds:
     trainer = Trainer(args, random_seed, save_name_base)
     for method_name in args.all_methods:
 
-        print(method_name)
-
         if method_name in ['DIGRAC', 'ib']:
+
             ### train the NN models
             save_path_best, save_path_latest = trainer.train(model_name=method_name)
+            
+            ### evaluate best model
+            print('\n--- best model ---')
+            kendalltau_full = []
+            upset_full = []
+            # evaluate for all GNN variants
+            for variant in GNN_variant_names:
+                score, pred_label = trainer.predict(model_name=method_name, model_path=save_path_best, GNN_variant=variant)
+                kendalltau, upset = trainer.evaluate(model_name=method_name, score=score, pred_label=pred_label, GNN_variant=variant)
+                kendalltau_full.append(kendalltau)
+                upset_full.append(upset)
+            
+            ### evaluate latest model
+            print('\n--- latest model ---')
+            kendalltau_full_latest = []
+            upset_full_latest = []
+            # evaluate for all GNN variants
+            for variant in GNN_variant_names:
+                score, pred_label = trainer.predict(model_name=method_name, model_path=save_path_latest, GNN_variant=variant)
+                kendalltau, upset = trainer.evaluate(model_name=method_name, score=score, pred_label=pred_label, GNN_variant=variant)
+                kendalltau_full_latest.append(kendalltau)
+                upset_full_latest.append(upset)
+
         else:
-            save_path_best, save_path_latest = (None, None)
+            # evaluate non-GNN methods
+            score, pred_label = trainer.predict(model_name=method_name)
+            kendalltau_full, upset_full = trainer.evaluate(model_name=method_name, score=score, pred_label=pred_label)
+            # non-GNN methods only have one 'best' model, not multiple
+            kendalltau_full_latest, upset_full_latest = (kendalltau_full, upset_full)
+            
 
-        ### evaluate best model
-        score, pred_label = trainer.predict(model_name=method_name, model_path=save_path_best)
-        kendalltau_full, upset_full = trainer.evaluate(model_name=method_name, score=score, pred_label=pred_label)
-
-        ### evaluate latest model
-        score, pred_label = trainer.predict(model_name=method_name, model_path=save_path_latest)
-        kendalltau_full_latest, upset_full_latest = trainer.evaluate(model_name=method_name, score=score, pred_label=pred_label)
-
-        #for now, only evaluate the way it was trained
-        #if method_name not in ['DIGRAC', 'ib']:
-        kendalltau_res[current_ind, current_seed_ind: current_seed_ind + args.num_trials] = kendalltau_full
-        kendalltau_res_latest[current_ind, current_seed_ind: current_seed_ind + args.num_trials] = kendalltau_full_latest
-        final_upset[current_ind, current_seed_ind: current_seed_ind + args.num_trials] = upset_full
-        final_upset_latest[current_ind, current_seed_ind: current_seed_ind + args.num_trials] = upset_full_latest
-        current_ind += 1
-        #else:
-        #    kendalltau_res[current_ind: current_ind+NUM_GNN_VARIANTS, current_seed_ind: current_seed_ind + args.num_trials] = kendalltau_full
-        #    kendalltau_res_latest[current_ind: current_ind+NUM_GNN_VARIANTS, current_seed_ind: current_seed_ind + args.num_trials] = kendalltau_full_latest
-        #    final_upset[current_ind: current_ind+NUM_GNN_VARIANTS, current_seed_ind: current_seed_ind + args.num_trials] = upset_full
-        #    final_upset_latest[current_ind: current_ind+NUM_GNN_VARIANTS, current_seed_ind: current_seed_ind + args.num_trials] = upset_full_latest
-        #    current_ind += NUM_GNN_VARIANTS
+        # append to overall results
+        if method_name not in ['DIGRAC', 'ib']:
+            kendalltau_res[current_ind, current_seed_ind: current_seed_ind + args.num_trials] = kendalltau_full
+            kendalltau_res_latest[current_ind, current_seed_ind: current_seed_ind + args.num_trials] = kendalltau_full_latest
+            final_upset[current_ind, current_seed_ind: current_seed_ind + args.num_trials] = upset_full
+            final_upset_latest[current_ind, current_seed_ind: current_seed_ind + args.num_trials] = upset_full_latest
+            current_ind += 1
+        else:
+            kendalltau_res[current_ind: current_ind+NUM_GNN_VARIANTS, current_seed_ind: current_seed_ind + args.num_trials] = kendalltau_full
+            kendalltau_res_latest[current_ind: current_ind+NUM_GNN_VARIANTS, current_seed_ind: current_seed_ind + args.num_trials] = kendalltau_full_latest
+            final_upset[current_ind: current_ind+NUM_GNN_VARIANTS, current_seed_ind: current_seed_ind + args.num_trials] = upset_full
+            final_upset_latest[current_ind: current_ind+NUM_GNN_VARIANTS, current_seed_ind: current_seed_ind + args.num_trials] = upset_full_latest
+            current_ind += NUM_GNN_VARIANTS
     current_seed_ind += args.num_trials
 
 # print results and save results to arrays

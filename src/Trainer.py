@@ -44,6 +44,7 @@ class Trainer(object):
                                     'PageRank', 'rankCentrality', 'syncRank', 'mvr', 'SVD_RS', 'SVD_NRS']
 
         self.label, self.train_mask, self.val_mask, self.test_mask, self.features, self.A = load_data(args, random_seed)
+        print('loaded test_mask:', self.test_mask)
         self.features = torch.FloatTensor(self.features).to(self.device)
         self.args.N = self.A.shape[0]
         self.A_torch = torch.FloatTensor(self.A.toarray()).to(self.device)
@@ -81,27 +82,19 @@ class Trainer(object):
                 self.test_mask[:, np.newaxis], self.splits, 1)
         write_log(vars(args), self.log_path)  # write the setting
 
+    def init_model(self, model_name, A=None):
 
-    def train(self, model_name, split=0):
-        #################################
-        # training and evaluation
-        #################################
-        if model_name not in self.GNN_model_names:
-            raise ValueError('Can only train GNN models using DIGRAC or ib')
-        
-        if self.args.upset_ratio_coeff + self.args.upset_margin_coeff == 0:
-            raise ValueError('Incorrect loss combination!')
-        
-        #args = self.args
-        A = scipy_sparse_to_torch_sparse(self.A).to(self.device)
+        if A is None: A = self.A
+
         if model_name == 'DIGRAC':
-            norm_A = get_powers_sparse(self.A, hop=1, tau=self.args.tau)[
+            norm_A = get_powers_sparse(A, hop=1, tau=self.args.tau)[
                 1].to(self.device)
-            norm_At = get_powers_sparse(self.A.transpose(), hop=1, tau=self.args.tau)[
+            norm_At = get_powers_sparse(A.transpose(), hop=1, tau=self.args.tau)[
                 1].to(self.device)
+            edge_index, edge_weights = (None, None)
         elif model_name == 'ib':
-            edge_index = torch.LongTensor(self.A.nonzero())
-            edge_weights = torch.FloatTensor(self.A.data)
+            edge_index = torch.LongTensor(A.nonzero())
+            edge_weights = torch.FloatTensor(A.data)
             edge_index1 = edge_index.clone().to(self.device)
             edge_weights1 = edge_weights.clone().to(self.device)
             edge_index2, edge_weights2 = get_second_directed_adj(edge_index, self.features.shape[0],self.features.dtype,
@@ -111,6 +104,7 @@ class Trainer(object):
             edge_index = (edge_index1, edge_index2)
             edge_weights = (edge_weights1, edge_weights2)
             del edge_index2, edge_weights2
+            norm_A, norm_At = (None, None)
         
         #for split in range(self.splits): # TODO: handle splits
         
@@ -137,6 +131,24 @@ class Trainer(object):
             model = DiGCN_Inception_Block_Ranking(num_features=self.nfeat, dropout=self.args.dropout,
         embedding_dim=self.args.hidden*2, Fiedler_layer_num=self.args.Fiedler_layer_num, alpha=self.args.alpha, 
         trainable_alpha=self.args.trainable_alpha, initial_score=score_torch, prob_dim=self.num_clusters, sigma=self.args.sigma).to(self.device)
+        
+        return model, edge_index, edge_weights, norm_A, norm_At
+
+
+    def train(self, model_name, split=0):
+        #################################
+        # training and evaluation
+        #################################
+        if model_name not in self.GNN_model_names:
+            raise ValueError('Can only train GNN models using DIGRAC or ib')
+        
+        if self.args.upset_ratio_coeff + self.args.upset_margin_coeff == 0:
+            raise ValueError('Incorrect loss combination!')
+        
+        #args = self.args
+        #A = scipy_sparse_to_torch_sparse(self.A).to(self.device)
+        
+        model, edge_index, edge_weights, norm_A, norm_At = self.init_model(model_name, A=self.A)
 
         ### initialize optimizer
         if self.args.optimizer == 'Adam':
@@ -333,30 +345,31 @@ class Trainer(object):
             np.save(save_path+identifier_str+'_pred'+str(split), pred_label)
             np.save(save_path+identifier_str+'_scores'+str(split), score.detach().cpu().numpy())
 
-        logstr += '\n From ' + identifier_str + ':,'
+        #logstr += '\n From ' + identifier_str + ': '
+        logstr += ', '
         if label_np is not None:
             # test
             tau, p_value = kendalltau(pred_label[test_index], label_np[test_index])
-            outstrtest = 'Test kendall tau: ,{:.3f}, kendall p value: ,{:.3f},'.format(tau, p_value)
+            outstrtest = f'Test kendall tau: {tau:.3f}, kendall p value: {p_value:.3f}, '
             kendalltau_full[0] = [tau, p_value]
 
             # val
             tau, p_value = kendalltau(pred_label[val_index], label_np[val_index])
-            outstrval = 'Validation kendall tau: ,{:.3f}, kendall p value: ,{:.3f},'.format(tau, p_value)
+            outstrval = f'Validation kendall tau: {tau:.3f}, kendall p value: {p_value:.3f}, '
             kendalltau_full[1] = [tau, p_value]
 
 
             # all
             tau, p_value = kendalltau(pred_label, label_np)
-            outstrall = 'All kendall tau: ,{:.3f}, kendall p value: ,{:.3f},'.format(tau, p_value)
+            outstrall = f'All kendall tau: {tau:.3f}, kendall p value: {p_value:.3f}, '
             kendalltau_full[2] = [tau, p_value]
 
             logstr += outstrtest + outstrval + outstrall
-        logstr += 'upset simple:,{:.6f},upset ratio:,{:.6f},upset naive:,{:.6f},'.format(upset_simple, upset_ratio.detach().item(), upset_naive)
+        logstr += f'upset simple: {upset_simple:.6f}, upset ratio: {upset_ratio.detach().item():.6f}, upset naive: {upset_naive:.6f}'
         return logstr, upset_full, kendalltau_full
 
 
-    def predict(self, model_name, model_path=None, A=None):
+    def predict(self, model_name, model_path=None, A=None, GNN_variant=None):
 
         # allow prediction for data loaded in different Trainer
         if A is None: A = self.A
@@ -367,7 +380,7 @@ class Trainer(object):
         elif model_name in self.GNN_model_names:
             if not model_path:
                 raise ValueError('Need to supply a path to a model for NN prediction (DIGRAC, ib).')
-            score, pred_label = self.predict_nn(model_name, model_path, A)
+            score, pred_label = self.predict_nn(model_name, model_path, A, GNN_variant=GNN_variant)
         
         else:
             raise NameError(f'Please input the correct model name from:\
@@ -377,13 +390,13 @@ class Trainer(object):
         return score, pred_label
     
 
-    def evaluate(self, model_name, score, pred_label, split=0):
+    def evaluate(self, model_name, score, pred_label, split=0, GNN_variant=None):
 
         if model_name in self.NON_GNN_model_names:
             kendalltau_full, upset_full = self.evaluate_non_nn(model_name, score, pred_label, split)
         
         elif model_name in self.GNN_model_names:
-            kendalltau_full, upset_full = self.evaluate_nn(model_name, score, pred_label, split)
+            kendalltau_full, upset_full = self.evaluate_nn(model_name, score, pred_label, split, GNN_variant)
 
         else:
             raise NameError(f'Please input the correct model name from:\
@@ -393,17 +406,14 @@ class Trainer(object):
         return kendalltau_full, upset_full
 
 
-    def predict_nn(self, model_name, model_path, A, split=0):
+    def predict_nn(self, model_name, model_path, A, split=0, GNN_variant=None):
+
+        # unless otherwise specified, predict the way it was trained: dist, innerproduct, or proximal_[dist, innerproduct, baseline]
+        if GNN_variant is None: GNN_variant = self.args.train_with
 
         ### initialize NN model
-        if model_name == 'DIGRAC':
-            model = DIGRAC_Ranking(num_features=self.nfeat, dropout=self.args.dropout, hop=self.args.hop, fill_value=self.args.tau, 
-        embedding_dim=self.args.hidden*2, Fiedler_layer_num=self.args.Fiedler_layer_num, alpha=self.args.alpha, 
-        trainable_alpha=self.args.trainable_alpha, initial_score=None, prob_dim=self.num_clusters, sigma=self.args.sigma).to(self.device)
-        elif model_name == 'ib':
-            model = DiGCN_Inception_Block_Ranking(num_features=self.nfeat, dropout=self.args.dropout,
-        embedding_dim=self.args.hidden*2, Fiedler_layer_num=self.args.Fiedler_layer_num, alpha=self.args.alpha, 
-        trainable_alpha=self.args.trainable_alpha, initial_score=None, prob_dim=self.num_clusters, sigma=self.args.sigma).to(self.device)
+        # note that for proximal prediction, we need initial scores
+        model, edge_index, edge_weights, norm_A, norm_At = self.init_model(model_name, A=A)
         
         ### load the model state
         model.load_state_dict(torch.load(model_path))
@@ -413,30 +423,17 @@ class Trainer(object):
 
         ### load data into model
         if model_name == 'DIGRAC':
-            norm_A = get_powers_sparse(A, hop=1, tau=self.args.tau)[1].to(self.device)
-            norm_At = get_powers_sparse(A.transpose(), hop=1, tau=self.args.tau)[1].to(self.device)
             _ = model(norm_A, norm_At, self.features)
         elif model_name == 'ib':
-            edge_index = torch.LongTensor(self.A.nonzero())
-            edge_weights = torch.FloatTensor(self.A.data)
-            edge_index1 = edge_index.clone().to(self.device)
-            edge_weights1 = edge_weights.clone().to(self.device)
-            edge_index2, edge_weights2 = get_second_directed_adj(edge_index, self.features.shape[0],self.features.dtype,
-            edge_weights)
-            edge_index2 = edge_index2.to(self.device)
-            edge_weights2 = edge_weights2.to(self.device)
-            edge_index = (edge_index1, edge_index2)
-            edge_weights = (edge_weights1, edge_weights2)
-            del edge_index2, edge_weights2
             _ = model(edge_index, edge_weights, self.features)
 
         ### obtain prediction
-        if self.args.train_with == 'dist':
+        if GNN_variant == 'dist':
             score_model = model.obtain_score_from_dist()
-        elif self.args.train_with == 'innerproduct':
+        elif GNN_variant == 'innerproduct':
             score_model = model.obtain_score_from_innerproduct()
-        else: # self.args.train_with ~ 'proximal ...'
-            score_model = model.obtain_score_from_proximal(self.args.train_with[9:]) # proximal 'dist', 'innerproduct', or 'baseline'
+        else: # GNN_variant ~ 'proximal ...'
+            score_model = model.obtain_score_from_proximal(GNN_variant[9:]) # proximal 'dist', 'innerproduct', or 'baseline'
 
         score = score_model
         pred_label = None
@@ -444,7 +441,7 @@ class Trainer(object):
         torch.cuda.empty_cache()
         return score, pred_label
     
-    def evaluate_nn(self, model_name, score, A=None, split=0):
+    def evaluate_nn(self, model_name, score, A=None, split=0, GNN_variant=None):
 
         if A is None: A = self.A
         A_torch = torch.FloatTensor(A.toarray()).to(self.device)
@@ -487,9 +484,9 @@ class Trainer(object):
         test_loss = self.args.upset_ratio_coeff * test_loss_upset_ratio + self.args.upset_margin_coeff * test_loss_upset_margin
         all_loss = self.args.upset_ratio_coeff * all_loss_upset_ratio + self.args.upset_margin_coeff * all_loss_upset_margin
 
-        logstr = 'Results for {}:,'.format(model_name, self.args.train_with)
-        logstr += 'val loss: ,{:.3f}, test loss: ,{:.3f}, all loss: ,{:.3f},'.format(val_loss.detach().item(), test_loss.detach().item(), all_loss.detach().item())
-        print(logstr)
+        logstr = f'Results for {model_name} {GNN_variant}:\n'
+        logstr += f' val loss: {val_loss.detach().item():.3f}, test loss: {test_loss.detach().item():.3f}, all loss: {all_loss.detach().item():.3f}'
+        #print(logstr)
 
         ### calculate kendalltau and upset
         # (the last two dimensions) rows: test, val, all; cols: kendall tau, kendall p value
@@ -501,23 +498,11 @@ class Trainer(object):
         upset_full = np.zeros([self.splits, self.NUM_UPSET_CHOICES])
         upset_full[:] = np.nan
 
-        #for now, only evaluate the way it was trained: dist, innerproduct, or proximal_[dist, innerproduct, baseline]
         base_save_path = self.log_path + '/'+model_name
+        #if no other GNN variant is given, evaluate the way it was trained: dist, innerproduct, or proximal_[dist, innerproduct, baseline]
+        if GNN_variant is None: GNN_variant = self.args.train_with
         logstr, upset_full[split], kendalltau_full[split] = self.evaluation(logstr, score, A_torch, self.label_np, val_index, test_index,
-                                                                            self.args.SavePred, base_save_path, split, self.args.train_with)
-
-        #score = model.obtain_score_from_dist()
-        #logstr, upset_full[0, split], kendalltau_full[0, split] = self.evaluation(logstr, score, A_torch, self.label_np, val_index, test_index, self.args.SavePred, \
-        #     base_save_path, split, 'dist')
-        
-        #score = model.obtain_score_from_innerproduct()
-        #logstr, upset_full[1, split], kendalltau_full[1, split] = self.evaluation(logstr, score, A_torch, self.label_np, val_index, test_index, self.args.SavePred, \
-        #    base_save_path, split, 'innerproduct')
-        
-        #for ind, start_from in enumerate(['dist', 'innerproduct', 'baseline']):
-        #    score = model.obtain_score_from_proximal(start_from)
-        #    logstr, upset_full[2 + ind, split], kendalltau_full[2 + ind, split] = self.evaluation(logstr, score, A_torch, self.label_np, val_index, test_index, self.args.SavePred, \
-        #        base_save_path, split, 'proximal_'+start_from)
+                                                                            self.args.SavePred, base_save_path, split, GNN_variant)
         
         print(logstr)
 
@@ -615,7 +600,6 @@ class Trainer(object):
         upset_simple = calculate_upsets(A_torch, torch.FloatTensor(-pred_label.reshape(pred_label.shape[0], 1)).to(self.device), style='simple').detach().item()
         upset_naive = calculate_upsets(A_torch, torch.FloatTensor(-pred_label.reshape(pred_label.shape[0], 1)).to(self.device), style='naive').detach().item()
         upset_full[split] = [upset_simple, upset_ratio, upset_naive]
-        logstr += 'upset simple:,{:.6f},upset ratio:,{:.6f},upset naive:,{:.6f},'.format(upset_simple, upset_ratio, upset_naive)
 
         if self.args.SavePred:
             np.save(self.log_path + '/'+model_name+
@@ -623,31 +607,32 @@ class Trainer(object):
             np.save(self.log_path + '/'+model_name+
                     '_scores'+str(split), score)
         
-        print('Final results for {}:'.format(model_name))
+        print('Results for {}:'.format(model_name))
 
         if self.label is not None:
             # test
             tau, p_value = kendalltau(pred_label[test_index], self.label_np[test_index])
-            outstrtest = 'Test kendall tau: ,{:.3f}, kendall p value: ,{:.3f},'.format(tau, p_value)
+            outstrtest = f'Test kendall tau: {tau:.3f}, kendall p value: {p_value:.3f}, '
             kendalltau_full[split, 0] = [tau, p_value]
             
             # val
             tau, p_value = kendalltau(pred_label[val_index], self.label_np[val_index])
-            outstrval = 'Validation kendall tau: ,{:.3f}, kendall p value: ,{:.3f},'.format(tau, p_value)
+            outstrval = f'Validation kendall tau: {tau:.3f}, kendall p value: {p_value:.3f}, '
             kendalltau_full[split, 1] = [tau, p_value]
             
             
             # all
             tau, p_value = kendalltau(pred_label, self.label_np)
-            outstrall = 'All kendall tau: ,{:.3f}, kendall p value: ,{:.3f},'.format(tau, p_value)
+            outstrall = f'All kendall tau: {tau:.3f}, kendall p value: {p_value:.3f}, '
             kendalltau_full[split, 2] = [tau, p_value]
                 
             logstr += outstrtest + outstrval + outstrall
 
+        logstr += f'upset simple: {upset_simple:.6f}, upset ratio: {upset_ratio:.6f}, upset naive: {upset_naive:.6f}'
         print(logstr)
 
-        with open(self.log_path + '/' + model_name + '_log'+str(split)+'.csv', 'a') as file:
-            file.write(logstr)
-            file.write('\n')
+        #with open(self.log_path + '/' + model_name + '_log'+str(split)+'.csv', 'a') as file:
+        #    file.write(logstr)
+        #    file.write('\n')
 
         return kendalltau_full, upset_full
