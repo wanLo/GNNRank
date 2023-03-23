@@ -2,20 +2,23 @@
 import os
 import random
 import pickle as pk
+from typing import Union, Tuple, List
 
 # third-party libraries
 import torch
 import scipy.sparse as sp
 import numpy.random as rnd
+from torch_geometric.data import Data
+import numpy as np
 
 # internal
 from .utils import  ERO
 from .extract_network import extract_network
 from .generate_data import to_dataset_no_label, to_dataset_no_split
+from .param_parser import ArgsNamespace
 
 
-
-def load_data_from_memory(root, name=None):
+def load_data_from_memory(root: str, name: Union[str, None]=None) -> List[Data]:
     data = pk.load(open(root, 'rb'))
     if os.path.isdir(root) == False:
         try:
@@ -24,12 +27,12 @@ def load_data_from_memory(root, name=None):
             pass
     return [data]
 
-def load_real_data(dataset):
-    A = sp.load_npz(os.path.join(os.path.dirname(os.path.realpath(
-    __file__)), '../data/'+dataset+'adj.npz'))
+def load_real_data(dataset: str) -> sp.spmatrix:
+    A = sp.load_npz(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../data/'+dataset+'adj.npz'))
     return A
 
-def load_data(args, random_seed):
+def load_data(args: ArgsNamespace, random_seed: int) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None],
+                                                       Union[np.ndarray, None], torch.Tensor, sp.spmatrix]:
     rnd.seed(random_seed)
     random.seed(random_seed)
     label = None

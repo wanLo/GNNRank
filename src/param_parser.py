@@ -1,9 +1,59 @@
 import argparse
 import os
+from typing import List
 
 import torch
 
-def parameter_parser():
+# https://stackoverflow.com/a/42279784 for type hints on Namespace object
+class ArgsNamespace(argparse.Namespace):
+    no_cuda: bool
+    cuda: bool
+    debug: bool
+    seed: int
+    epochs: int
+    lr: float
+    weight_decay: float
+    hidden: int
+    dropout: float
+    sigma: float
+    alpha: float
+    trainable_alpha: bool
+    Fiedler_layer_num: int
+    train_with: str
+    optimizer: str
+    pretrain_with: str
+    pretrain_epochs: int
+    baseline: str
+    all_methods: List[str]
+    seeds: List[int]
+    season: int
+    p: float
+    N: int
+    K: int
+    F: int
+    train_ratio: float
+    test_ratio: float
+    hop: int
+    tau: float
+    num_trials: int
+    ERO_style: str
+    eta: float
+    upset_ratio_coeff: float
+    upset_margin_coeff: float
+    upset_margin: float
+    early_stopping: int
+    fill_val: float
+    regenerate_data: bool
+    load_only: bool
+    AllTrain: bool
+    SavePred: bool
+    log_root: str
+    data_path: str
+    dataset: str
+    device: torch.device
+
+
+def parameter_parser() -> ArgsNamespace:
     """
     A method to parse up command line parameters.
     """
@@ -96,7 +146,8 @@ def parameter_parser():
                         help='Data set folder.')
     parser.add_argument('--dataset', type=str, default='ERO/', help='Data set selection.')
     
-    args, unknown = parser.parse_known_args()
+    args_namespace = ArgsNamespace()
+    args, unknown = parser.parse_known_args(namespace=args_namespace)
     
     if args.dataset[-1]!='/':
         args.dataset += '/'

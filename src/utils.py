@@ -1,4 +1,5 @@
 import csv
+from typing import Tuple
 
 import numpy as np
 import scipy.sparse as sp
@@ -16,7 +17,7 @@ def write_log(args, path):
             writer.writerow([para, args[para]])
     return
 
-def ERO(n: int, p: float, eta: float, style:str='uniform') -> sp.csr_matrix:
+def ERO(n: int, p: float, eta: float, style:str='uniform') -> Tuple[sp.csr_matrix, np.ndarray]:
     """A Erdos-Renyi Outliers (ERO) model graph generator.
     Args:
         n: (int) Number of nodes.

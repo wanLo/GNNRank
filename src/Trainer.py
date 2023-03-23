@@ -1,11 +1,13 @@
 import os
 import time
 from datetime import datetime
+from typing import Union, Tuple
 
 import numpy as np
 import torch
 import torch.optim as optim
 from scipy.stats import kendalltau, rankdata
+import scipy.sparse as sp
 from tqdm.auto import tqdm # automatically use command-line or notebook version
 
 # internal files
@@ -17,6 +19,7 @@ from .get_adj import get_second_directed_adj
 from .SpringRank import SpringRank
 from .comparison import syncRank_angle, syncRank, serialRank, btl, davidScore, eigenvectorCentrality, PageRank, rankCentrality, mvr
 from .comparison import SVD_RS, SVD_NRS, serialRank_matrix
+from .param_parser import ArgsNamespace
 
 
 class Trainer(object):
@@ -24,7 +27,7 @@ class Trainer(object):
     Object to train and score different models.
     """
 
-    def __init__(self, args, random_seed, save_name_base):
+    def __init__(self, args: ArgsNamespace, random_seed: int, save_name_base: str):
         """
         Constructing the trainer instance.
         :param args: Arguments object.
@@ -82,7 +85,8 @@ class Trainer(object):
                 self.test_mask[:, np.newaxis], self.splits, 1)
         write_log(vars(args), self.log_path)  # write the setting
 
-    def init_model(self, model_name, A=None):
+    def init_model(self, model_name: str, A: Union[sp.spmatrix, None]=None):
+        #-> tuple[DIGRAC_Ranking | DiGCN_Inception_Block_Ranking | Unbound, tuple[Tensor, Tensor] | Unbound | None, tuple[Tensor, Tensor] | Unbound | None, Any | Unbound | None, Any | Unbound | None]
 
         if A is None: A = self.A
 
@@ -135,7 +139,7 @@ class Trainer(object):
         return model, edge_index, edge_weights, norm_A, norm_At
 
 
-    def train(self, model_name, split=0):
+    def train(self, model_name: str, split: int=0):
         #################################
         # training and evaluation
         #################################
@@ -369,7 +373,8 @@ class Trainer(object):
         return logstr, upset_full, kendalltau_full
 
 
-    def predict(self, model_name, model_path=None, A=None, GNN_variant=None):
+    def predict(self, model_name: str, model_path: Union[str, None]=None,
+                A: Union[sp.spmatrix, None]=None, GNN_variant: Union[str, None]=None):
 
         # allow prediction for data loaded in different Trainer
         if A is None: A = self.A
