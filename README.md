@@ -112,8 +112,8 @@ GNNRank provides various command line arguments, which can be viewed in the ./sr
   --seed                  INT         Random seed.                                              Default is 31.
   --no-cuda               BOOL        Disables CUDA training.                                   Default is False.
   --debug, -D             BOOL        Debug with minimal training setting, not to get results.  Default is False.
-  -AllTrain, -All         BOOL        Whether to use all data to do gradient descent.           Default is False.
-  --SavePred, -SP         BOOL        Whether to save predicted results.                        Default is False.
+  --AllTrain              BOOL        Whether to use all data to do gradient descent.           Default is False.
+  --SavePred              BOOL        Whether to save predicted results.                        Default is False.
   --dataset               STR         Data set to consider.                                     Default is 'ERO/'.
   --all_methods           LST         Methods to use to generate results.                       Default is ['btl','DIGRAC'].
 ```

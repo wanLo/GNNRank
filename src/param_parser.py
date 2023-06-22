@@ -138,8 +138,8 @@ def parameter_parser() -> ArgsNamespace:
                         help='The value to be filled when we originally have 0, from meta-graph adj to meta-graph to generate data.')
     parser.add_argument('--regenerate_data', action='store_true', help='Whether to force creation of data splits.')
     parser.add_argument('--load_only', action='store_true', help='Whether not to store generated data.')
-    parser.add_argument('-AllTrain', '-All', action='store_true', help='Whether to use all data to do gradient descent.')
-    parser.add_argument('-SavePred', '-SP', action='store_true', help='Whether to save predicted labels.')
+    parser.add_argument('--AllTrain', '-All', action='store_true', help='Whether to use all data to do gradient descent.')
+    parser.add_argument('--SavePred', '-SP', action='store_true', help='Whether to save predicted labels.')
     parser.add_argument('--log_root', type=str, default=os.path.join(os.path.dirname(os.path.realpath(__file__)),'../logs/'), 
                         help='The path saving model.t7 and the training process')
     parser.add_argument('--data_path', type=str, default=os.path.join(os.path.dirname(os.path.realpath(__file__)),'../data/'), 
@@ -149,8 +149,8 @@ def parameter_parser() -> ArgsNamespace:
     args_namespace = ArgsNamespace()
     args, unknown = parser.parse_known_args(namespace=args_namespace)
     
-    if args.dataset[-1]!='/':
-        args.dataset += '/'
+    #if args.dataset[-1]!='/':
+    #    args.dataset += '/'
 
     if args.dataset[:3] != 'ERO':
         args.AllTrain = True

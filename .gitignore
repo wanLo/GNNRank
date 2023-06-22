@@ -143,3 +143,6 @@ result_arrays/debug/
 
 # train-test splits
 *train_*test_*.pk
+
+# all data
+data/

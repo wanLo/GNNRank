@@ -27,10 +27,15 @@ class Trainer(object):
     Object to train and score different models.
     """
 
-    def __init__(self, args: ArgsNamespace, random_seed: int, save_name_base: str):
+    def __init__(self, args: ArgsNamespace, random_seed: int, save_name_base: str, adj = None):
         """
         Constructing the trainer instance.
-        :param args: Arguments object.
+        
+        Parameters
+        ----------
+        - args: Arguments object
+        - ...
+        - adj: If provided, use this adjacency matrix instead of loading data from disk
         """
         self.args = args
         self.device = args.device
@@ -46,7 +51,7 @@ class Trainer(object):
         self.NON_GNN_model_names = ['SpringRank', 'btl', 'davidScore', 'eigenvectorCentrality',
                                     'PageRank', 'rankCentrality', 'syncRank', 'mvr', 'SVD_RS', 'SVD_NRS']
 
-        self.label, self.train_mask, self.val_mask, self.test_mask, self.features, self.A = load_data(args, random_seed)
+        self.label, self.train_mask, self.val_mask, self.test_mask, self.features, self.A = load_data(args, random_seed, adj=adj)
         print('loaded test_mask:', self.test_mask)
         self.features = torch.FloatTensor(self.features).to(self.device)
         self.args.N = self.A.shape[0]

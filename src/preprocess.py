@@ -31,7 +31,7 @@ def load_real_data(dataset: str) -> sp.spmatrix:
     A = sp.load_npz(os.path.join(os.path.dirname(os.path.realpath(__file__)), '../data/'+dataset+'adj.npz'))
     return A
 
-def load_data(args: ArgsNamespace, random_seed: int) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None],
+def load_data(args: ArgsNamespace, random_seed: int, adj = None) -> Tuple[Union[np.ndarray, None], Union[np.ndarray, None], Union[np.ndarray, None],
                                                        Union[np.ndarray, None], torch.Tensor, sp.spmatrix]:
     rnd.seed(random_seed)
     random.seed(random_seed)
@@ -53,6 +53,10 @@ def load_data(args: ArgsNamespace, random_seed: int) -> Tuple[Union[np.ndarray, 
             A, label = ERO(n=args.N, p=args.p, eta=args.eta, style=args.ERO_style)
             A, label = extract_network(A, label)
             data = to_dataset_no_split(A, args.K, torch.LongTensor(label), save_path=save_path,
+                          load_only=args.load_only)
+        elif adj is not None:
+            A = sp.csr_matrix(adj)
+            data = to_dataset_no_label(A, args.K, save_path=save_path,
                           load_only=args.load_only)
         else:
             A = load_real_data(args.dataset)
