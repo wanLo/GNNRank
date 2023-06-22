@@ -102,7 +102,9 @@ class Trainer(object):
                 1].to(self.device)
             edge_index, edge_weights = (None, None)
         elif model_name == 'ib':
-            edge_index = torch.LongTensor(A.nonzero())
+            #edge_index = torch.LongTensor(A.nonzero())
+            coo = A.tocoo()
+            edge_index = torch.LongTensor((coo.row, coo.col))
             edge_weights = torch.FloatTensor(A.data)
             edge_index1 = edge_index.clone().to(self.device)
             edge_weights1 = edge_weights.clone().to(self.device)

@@ -55,7 +55,7 @@ def load_data(args: ArgsNamespace, random_seed: int, adj = None) -> Tuple[Union[
             data = to_dataset_no_split(A, args.K, torch.LongTensor(label), save_path=save_path,
                           load_only=args.load_only)
         elif adj is not None:
-            A = sp.csr_matrix(adj)
+            A = adj
             data = to_dataset_no_label(A, args.K, save_path=save_path,
                           load_only=args.load_only)
         else:
