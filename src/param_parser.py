@@ -51,6 +51,7 @@ class ArgsNamespace(argparse.Namespace):
     data_path: str
     dataset: str
     device: torch.device
+    be_silent: bool
 
 
 def parameter_parser() -> ArgsNamespace:
@@ -145,6 +146,7 @@ def parameter_parser() -> ArgsNamespace:
     parser.add_argument('--data_path', type=str, default=os.path.join(os.path.dirname(os.path.realpath(__file__)),'../data/'), 
                         help='Data set folder.')
     parser.add_argument('--dataset', type=str, default='ERO/', help='Data set selection.')
+    parser.add_argument('--be_silent', action='store_true', help='Suppresses standard output.')
     
     args_namespace = ArgsNamespace()
     args, unknown = parser.parse_known_args(namespace=args_namespace)

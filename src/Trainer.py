@@ -52,7 +52,7 @@ class Trainer(object):
                                     'PageRank', 'rankCentrality', 'syncRank', 'mvr', 'SVD_RS', 'SVD_NRS']
 
         self.label, self.train_mask, self.val_mask, self.test_mask, self.features, self.A = load_data(args, random_seed, adj=adj)
-        print('loaded test_mask:', self.test_mask)
+        if not self.args.be_silent: print('loaded test_mask:', self.test_mask)
         self.features = torch.FloatTensor(self.features).to(self.device)
         self.args.N = self.A.shape[0]
         self.A_torch = torch.FloatTensor(self.A.toarray()).to(self.device)
@@ -74,12 +74,6 @@ class Trainer(object):
         self.log_path = os.path.join(os.path.dirname(os.path.realpath(
             __file__)), args.log_root, args.dataset, save_name, date_time)
 
-        if os.path.isdir(self.log_path) == False:
-            try:
-                os.makedirs(self.log_path)
-            except FileExistsError:
-                print('Folder exists!')
-
         self.splits = self.args.num_trials
         if self.test_mask is not None and self.test_mask.ndim == 1:
             self.train_mask = np.repeat(
@@ -88,7 +82,15 @@ class Trainer(object):
                 self.val_mask[:, np.newaxis], self.splits, 1)
             self.test_mask = np.repeat(
                 self.test_mask[:, np.newaxis], self.splits, 1)
-        write_log(vars(args), self.log_path)  # write the setting
+        
+        if not self.args.load_only:
+            if os.path.isdir(self.log_path) == False:
+                try:
+                    os.makedirs(self.log_path)
+                except FileExistsError:
+                    print('Folder exists!')
+
+            write_log(vars(args), self.log_path)  # write the settings
 
     def init_model(self, model_name: str, A: Union[sp.spmatrix, None]=None):
         #-> tuple[DIGRAC_Ranking | DiGCN_Inception_Block_Ranking | Unbound, tuple[Tensor, Tensor] | Unbound | None, tuple[Tensor, Tensor] | Unbound | None, Any | Unbound | None, Any | Unbound | None]
@@ -309,15 +311,27 @@ class Trainer(object):
                 if save_perform <= best_val_loss:
                     early_stopping = 0
                     best_val_loss = save_perform
+
+                    if os.path.isdir(self.log_path) == False:
+                        try:
+                            os.makedirs(self.log_path)
+                        except FileExistsError:
+                            print('Folder exists!')
                     save_path_best = self.log_path +'/'+model_name+'_model'+str(split)+'.t7'
                     torch.save(model.state_dict(), save_path_best) # save the best model
                 else:
                     early_stopping += 1
                 if early_stopping > self.args.early_stopping:
                     tqdm_bar.close()
-                    print(f'Early stopped after {self.args.early_stopping} epochs without improvement.')
+                    if not self.args.be_silent:
+                        print(f'Early stopped after {self.args.early_stopping} epochs without improvement.')
                     break
         
+        if os.path.isdir(self.log_path) == False:
+            try:
+                os.makedirs(self.log_path)
+            except FileExistsError:
+                print('Folder exists!')
         save_path_latest = self.log_path + '/' + model_name + '_model_latest' + str(split) + '.t7'
         torch.save(model.state_dict(), save_path_latest) # save the latest model
 

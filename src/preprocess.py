@@ -45,10 +45,10 @@ def load_data(args: ArgsNamespace, random_seed: int, adj = None) -> Tuple[Union[
     save_path = os.path.join(os.path.dirname(os.path.realpath(
         __file__)), '../data/'+args.dataset+default_name_base+'.pk')
     if (not args.regenerate_data) and os.path.exists(save_path):
-        print('Loading existing data!')
+        if not args.be_silent: print('Loading existing data!')
         data = load_data_from_memory(save_path, name=None)[0]
     else:
-        print('Generating new data or new data splits!')
+        if not args.be_silent: print('Generating new data or new data splits!')
         if args.dataset[:3] == 'ERO':
             A, label = ERO(n=args.N, p=args.p, eta=args.eta, style=args.ERO_style)
             A, label = extract_network(A, label)
