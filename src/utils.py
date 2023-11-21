@@ -102,7 +102,7 @@ def hermitian_feature(A, num_clusters):
     H_abs = np.abs(H)  # (np.real(H).power(2) + np.imag(H).power(2)).power(0.5)
     D_abs_inv = sp.diags(1/np.array(H_abs.sum(1))[:, 0])
     H_rw = D_abs_inv.dot(H)
-    u, _, _ = sp.linalg.svds(H_rw, k=num_clusters)
+    u, _, _ = sp.linalg.svds(H_rw, k=num_clusters, solver='lobpcg')
     features_SVD = np.concatenate((np.real(u), np.imag(u)), axis=1)
     scaler = StandardScaler().fit(features_SVD)
     features_SVD = scaler.transform(features_SVD)
