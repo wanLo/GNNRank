@@ -87,7 +87,8 @@ def syncRank_angle(A):
     fancyH = Dinv.dot(H)
 
     # 6. Leading eigenvector of fancyH
-    _, V = sp.linalg.eigs(fancyH,1,which='LM')
+    #_, V = sp.linalg.eigs(fancyH,1,which='LM')
+    V,_,_ = sp.linalg.svds(fancyH,1,which='LM',solver='lobpcg')  # works better than arpack on very large matrices
 
     # 7. Get angles in complex plane.
     angles = np.angle(V)
