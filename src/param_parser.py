@@ -52,6 +52,7 @@ class ArgsNamespace(argparse.Namespace):
     dataset: str
     device: torch.device
     be_silent: bool
+    exposure_coeff: float
 
 
 def parameter_parser() -> ArgsNamespace:
