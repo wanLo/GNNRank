@@ -113,10 +113,11 @@ class Trainer(object):
         self.label, self.train_mask, self.val_mask, self.test_mask, self.features, self.A = load_data(args, random_seed, adj=adj)
         if not self.args.be_silent: print('loaded test_mask:', self.test_mask)
 
-        # add group membership to features
+        # add a group membership module
         group_feature = torch.reshape(torch.FloatTensor(groups)*20 -10, (self.A.shape[0], 1))
         self.features = torch.cat((torch.FloatTensor(self.features), group_feature), dim=1)
         #self.features = torch.reshape(torch.FloatTensor(groups), (self.A.shape[0], 1))
+        #self.groups = torch.FloatTensor(groups)
 
         self.features = torch.FloatTensor(self.features).to(self.device)
         self.args.N = self.A.shape[0]
@@ -327,10 +328,12 @@ class Trainer(object):
                     train_loss_upset_ratio.detach().item(), train_loss_upset_margin.detach().item())
 
                 #combined_loss = self.args.exposure_coeff * exposure_loss + (1-self.args.exposure_coeff) * train_loss
-                combined_loss = exposure_loss * 3 + train_loss #train_loss + exposure_loss * 1000
+                combined_loss = train_loss + exposure_loss *2
                 #print(combined_loss)
-                print('train/exposure/combined loss:', f'{train_loss.detach()[0]:.4f}, {exposure_loss.detach():.4f}, {combined_loss.detach()[0]:.4f}')
+                #print('train/exposure/combined loss:', f'{train_loss.detach()[0]:.4f}, {exposure_loss.detach():.4f}, {combined_loss.detach()[0]:.4f}')
 
+                #print('previous loss:')
+                #print([param.grad for param in model.parameters()])
                 opt.zero_grad()
                 try:
                     #print('before')
@@ -338,7 +341,7 @@ class Trainer(object):
                     combined_loss.backward()
                     #exposure_loss.backward()
                     #train_loss.backward()
-                    #print('after')
+                    #print('new loss:')
                     #print([param.grad for param in model.parameters()])
                 except RuntimeError:
                     log_str = '{} trial {} RuntimeError!'.format(model_name, split)
